@@ -14,8 +14,6 @@ import styled from 'styled-components/macro';
 import tw from 'twin.macro';
 import Input from '@/components/elements/Input';
 import { ip } from '@/lib/formatters';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
 type Props = RequiredModalProps;
 
@@ -24,14 +22,14 @@ interface Values {
 }
 
 const ServerResult = styled(Link)`
-    ${tw`w-full flex items-center bg-gray-900 p-4 rounded border-l-4 border-neutral-900 no-underline transition-all duration-150`};
+    ${tw`flex items-center bg-neutral-900 p-4 rounded border-l-4 border-neutral-900 no-underline transition-all duration-150`};
 
     &:hover {
         ${tw`shadow border-cyan-500`};
     }
 
     &:not(:last-of-type) {
-        ${tw`mb-1`};
+        ${tw`mb-2`};
     }
 `;
 
@@ -39,23 +37,23 @@ const SearchWatcher = () => {
     const { values, submitForm } = useFormikContext<Values>();
 
     useEffect(() => {
-        submitForm();
+        if (values.term.length >= 3) {
+            submitForm();
+        }
     }, [values.term]);
 
     return null;
 };
 
-export default () => {
+export default ({ ...props }: Props) => {
     const ref = useRef<HTMLInputElement>(null);
     const isAdmin = useStoreState((state) => state.user.data!.rootAdmin);
     const [servers, setServers] = useState<Server[]>([]);
     const { clearAndAddHttpError, clearFlashes } = useStoreActions(
         (actions: Actions<ApplicationStore>) => actions.flashes
     );
-    var showResults = true;
 
     const search = debounce(({ term }: Values, { setSubmitting }: FormikHelpers<Values>) => {
-        if(term.length > 2) {
         clearFlashes('search');
 
         // if (ref.current) ref.current.focus();
@@ -67,11 +65,13 @@ export default () => {
             })
             .then(() => setSubmitting(false))
             .then(() => ref.current?.focus());
-        } else {
-            showResults = false;
-            setSubmitting(false);
-        }
     }, 500);
+
+    useEffect(() => {
+        if (props.visible) {
+            if (ref.current) ref.current.focus();
+        }
+    }, [props.visible]);
 
     // Formik does not support an innerRef on custom components.
     const InputWithRef = (props: any) => <Input autoFocus {...props} ref={ref} />;
@@ -85,24 +85,26 @@ export default () => {
             initialValues={{ term: '' } as Values}
         >
             {({ isSubmitting }) => (
-                <div className="searchInput">
+                <Modal {...props}>
                     <Form>
                         <FormikFieldWrapper
                             name={'term'}
+                            label={'Search term'}
+                            description={'Enter a server name, uuid, or allocation to begin searching.'}
                         >
                             <SearchWatcher />
                             <InputSpinner visible={isSubmitting}>
-                                <FontAwesomeIcon icon={faSearch} />
-                                <Field as={InputWithRef} name={'term'} placeholder="Enter a server name, uuid, or allocation" />
+                                <Field as={InputWithRef} name={'term'} />
                             </InputSpinner>
                         </FormikFieldWrapper>
                     </Form>
-                    {(servers.length > 0 && showResults) && (
-                        <div css={tw`mt-4`}>
+                    {servers.length > 0 && (
+                        <div css={tw`mt-6`}>
                             {servers.map((server) => (
                                 <ServerResult
                                     key={server.uuid}
                                     to={`/server/${server.id}`}
+                                    onClick={() => props.onDismissed()}
                                 >
                                     <div css={tw`flex-1 mr-4`}>
                                         <p css={tw`text-sm`}>{server.name}</p>
@@ -125,7 +127,7 @@ export default () => {
                             ))}
                         </div>
                     )}
-                </div>
+                </Modal>
             )}
         </Formik>
     );
